@@ -8,6 +8,7 @@ janela nunca travar. Nao usa console (abra pelo AutoBuy.bat).
 import queue
 import threading
 import datetime
+import configparser
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 
@@ -67,11 +68,13 @@ class RunState:
 # ---------------------------------------------------------------------------
 # Thread de trabalho
 # ---------------------------------------------------------------------------
-def worker(core, controls, state, rolls):
+def worker(core, controls, state, rolls, delay):
     try:
         state.emit("Detectando emulador e display do E7...")
         core.setup()
-        state.emit(f"Device: {core.device}  |  display logico: {core.e7_input_display}")
+        core.delay = delay  # sobrescreve o delay do config.ini
+        state.emit(f"Device: {core.device}  |  display logico: {core.e7_input_display}"
+                   f"  |  delay: {delay}x")
         res = core.screen()
         if not core.is_16_9(res):
             state.error = (f"Resolucao {res.size[0]}x{res.size[1]} nao suportada. "
@@ -162,17 +165,32 @@ class App:
         ttk.Label(root, text="E7 Shop refresher - Barbedo", style="Title.TLabel").grid(
             row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
-        # --- entrada de skystones ---
-        ttk.Label(root, text="Skystones a gastar:").grid(row=1, column=0, sticky="w")
+        # --- entradas (skystones + delay) ---
+        inp = ttk.Frame(root)
+        inp.grid(row=1, column=0, columnspan=3, sticky="we")
+
+        ttk.Label(inp, text="Skystones a gastar:").grid(row=0, column=0, sticky="w",
+                                                         pady=2)
         self.sky_var = tk.StringVar(value="")
-        self.sky_entry = ttk.Entry(root, width=10, textvariable=self.sky_var,
+        self.sky_entry = ttk.Entry(inp, width=10, textvariable=self.sky_var,
                                    justify="right")
-        self.sky_entry.grid(row=1, column=1, sticky="w", padx=(6, 6))
+        self.sky_entry.grid(row=0, column=1, sticky="w", padx=(6, 8), pady=2)
         self.sky_entry.focus()
-        self.refresh_hint = ttk.Label(root, text="cada refresh custa 3 skystones",
+        self.refresh_hint = ttk.Label(inp, text="cada refresh custa 3 skystones",
                                       foreground="#777")
-        self.refresh_hint.grid(row=1, column=2, sticky="w")
+        self.refresh_hint.grid(row=0, column=2, sticky="w")
         self.sky_var.trace_add("write", lambda *_: self._update_hint())
+
+        ttk.Label(inp, text="Delay (velocidade):").grid(row=1, column=0, sticky="w",
+                                                        pady=2)
+        self.delay_var = tk.StringVar(value=self._config_delay())
+        self.delay_entry = ttk.Entry(inp, width=10, textvariable=self.delay_var,
+                                     justify="right")
+        self.delay_entry.grid(row=1, column=1, sticky="w", padx=(6, 8), pady=2)
+        self.delay_hint = ttk.Label(inp, text="menor = mais rapido (padrao 1.5)",
+                                    foreground="#777")
+        self.delay_hint.grid(row=1, column=2, sticky="w")
+        self.delay_var.trace_add("write", lambda *_: self._update_delay_hint())
 
         # --- botoes ---
         btns = ttk.Frame(root)
@@ -218,6 +236,32 @@ class App:
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ---- helpers ----
+    def _config_delay(self):
+        try:
+            cfg = configparser.ConfigParser()
+            cfg.read("config.ini")
+            return cfg.get("Refresh", "delay").strip()
+        except Exception:
+            return "1.5"
+
+    def _parse_delay(self):
+        try:
+            d = float(self.delay_var.get().strip().replace(",", "."))
+        except (ValueError, TypeError):
+            return None
+        return d if d > 0 else None
+
+    def _update_delay_hint(self):
+        d = self._parse_delay()
+        if d is None:
+            self.delay_hint.config(text="valor invalido", foreground="#c00000")
+        elif d < 0.8:
+            self.delay_hint.config(text=f"{d}x - rapido (cuidado com erros)",
+                                   foreground="#b06000")
+        else:
+            self.delay_hint.config(text=f"{d}x - menor = mais rapido",
+                                   foreground="#0a7d00")
+
     def _parse_rolls(self):
         try:
             sky = int(float(self.sky_var.get()))
@@ -258,6 +302,7 @@ class App:
 
     def _set_running_ui(self, running):
         self.sky_entry.config(state="disabled" if running else "normal")
+        self.delay_entry.config(state="disabled" if running else "normal")
         self.btn_start.config(state="disabled" if running else "normal")
         self.btn_pause.config(state="normal" if running else "disabled",
                               text="Pausar")
@@ -270,6 +315,11 @@ class App:
             messagebox.showerror("Valor invalido",
                                  "Informe pelo menos 3 skystones (1 refresh).")
             return
+        delay = self._parse_delay()
+        if delay is None:
+            messagebox.showerror("Delay invalido",
+                                 "Informe um delay maior que 0 (ex: 1.5).")
+            return
 
         self.core = E7Core()
         self.controls = Controls()
@@ -279,7 +329,7 @@ class App:
 
         self._set_running_ui(True)
         self.thread = threading.Thread(
-            target=worker, args=(self.core, self.controls, self.state, rolls),
+            target=worker, args=(self.core, self.controls, self.state, rolls, delay),
             daemon=True)
         self.thread.start()
         self.root.after(200, self._poll)
