@@ -53,6 +53,15 @@ class E7Core:
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return p.stdout, p.stdout.decode("utf-8", "ignore")
 
+    # Portas de ADB comuns de emuladores (MuMu Nx/12, LDPlayer, Nox, etc.)
+    COMMON_PORTS = [7555, 16384, 5555, 5556, 5554, 62001, 62025, 21503]
+
+    def ensure_connected(self):
+        """Tenta conectar nas portas comuns de emulador (o MuMu Nx nao
+        registra o device sozinho no 'adb devices')."""
+        for port in self.COMMON_PORTS:
+            self._run(f"connect 127.0.0.1:{port}")
+
     def pick_device(self):
         """Escolhe o primeiro device conectado. Devolve o serial ou None."""
         _, txt = self._run("devices")
@@ -140,8 +149,11 @@ class E7Core:
     def setup(self):
         """Carrega config, escolhe device e detecta o display do E7."""
         self.load_config()
+        self.ensure_connected()
         if not self.pick_device():
-            raise RuntimeError("Nenhum device conectado no ADB.")
+            raise RuntimeError(
+                "Nenhum device conectado no ADB. Verifique se o emulador "
+                "(MuMu) esta aberto com o Epic Seven.")
         self.detect_e7_display()
 
     # ------------------------------------------------------------------

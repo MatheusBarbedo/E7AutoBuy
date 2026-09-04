@@ -146,7 +146,7 @@ class App:
         self.state = None
         self.thread = None
 
-        root.title("E7 AutoBuy")
+        root.title("E7 Shop refresher - Barbedo")
         root.resizable(False, False)
         root.configure(padx=16, pady=14)
 
@@ -159,7 +159,7 @@ class App:
         style.configure("Val.TLabel", font=("Segoe UI", 10, "bold"))
         style.configure("Title.TLabel", font=("Segoe UI", 13, "bold"))
 
-        ttk.Label(root, text="E7 AutoBuy", style="Title.TLabel").grid(
+        ttk.Label(root, text="E7 Shop refresher - Barbedo", style="Title.TLabel").grid(
             row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
         # --- entrada de skystones ---
