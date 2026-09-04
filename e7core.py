@@ -18,6 +18,9 @@ from PIL import Image
 
 SKYSTONES_PER_REFRESH = 3
 
+# Impede que cada processo adb abra uma janelinha de console (Windows).
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def log_crash(handled=""):
     """Registra a excecao atual no crash.log (chamar dentro de except)."""
@@ -50,7 +53,8 @@ class E7Core:
 
     def _run(self, args):
         p = subprocess.run(f"{self._adb_prefix()} {args}", shell=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           creationflags=_NO_WINDOW)
         return p.stdout, p.stdout.decode("utf-8", "ignore")
 
     # Portas de ADB comuns de emuladores (MuMu Nx/12, LDPlayer, Nox, etc.)
@@ -80,10 +84,12 @@ class E7Core:
         return f"{self._adb_prefix()} shell input{d}"
 
     def click(self, x, y):
-        subprocess.Popen(f"{self._input_prefix()} tap {x} {y}")
+        subprocess.Popen(f"{self._input_prefix()} tap {x} {y}",
+                         creationflags=_NO_WINDOW)
 
     def swipe(self, x1, y1, x2, y2):
-        subprocess.Popen(f"{self._input_prefix()} swipe {x1} {y1} {x2} {y2}")
+        subprocess.Popen(f"{self._input_prefix()} swipe {x1} {y1} {x2} {y2}",
+                         creationflags=_NO_WINDOW)
 
     # ------------------------------------------------------------------
     # Captura de tela (com correcao do aviso multi-display do MuMu Nx)
