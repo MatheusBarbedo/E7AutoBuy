@@ -2,3 +2,10 @@ __pycache__/
 *.pyc
 crash.log
 logs.txt
+
+# artefatos de build
+build/
+dist/
+installer_output/
+*.spec
+assets/icon.png

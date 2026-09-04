@@ -5,6 +5,8 @@ display (MuMu Nx multi-display), captura de tela, cliques, reroll,
 compra e OCR. Usado tanto pela interface grafica (autobuy_gui.py)
 quanto pela versao de terminal (autobuy_fixed.py).
 """
+import os
+import sys
 import subprocess
 import re
 import time
@@ -22,9 +24,22 @@ SKYSTONES_PER_REFRESH = 3
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
+def app_dir():
+    """Pasta base do app (onde estao platform-tools/ e tesseract/).
+
+    Funciona tanto rodando pelo .py quanto empacotado com PyInstaller."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def app_path(name):
+    return os.path.join(app_dir(), name)
+
+
 def log_crash(handled=""):
     """Registra a excecao atual no crash.log (chamar dentro de except)."""
-    logging.basicConfig(filename="crash.log")
+    logging.basicConfig(filename=app_path("crash.log"))
     logging.exception(f"\n{datetime.datetime.now()}{handled}\n")
 
 
@@ -40,11 +55,36 @@ class E7Core:
     # Configuracao / ADB
     # ------------------------------------------------------------------
     def load_config(self, path="config.ini"):
+        """Localiza adb/tesseract. Prefere os inclusos na pasta do app
+        (portavel/instalado); cai para o config.ini como fallback."""
+        base = app_dir()
+        adb = os.path.join(base, "platform-tools", "adb.exe")
+        tess = os.path.join(base, "tesseract", "tesseract.exe")
+        delay = 1.5
+
         cfg = configparser.ConfigParser()
-        cfg.read(path)
-        ocr.pytesseract.tesseract_cmd = cfg.get("Refresh", "tesseractPath")
-        self.adb_path = '"' + cfg.get("Refresh", "adbPath") + '"'
-        self.delay = cfg.getfloat("Refresh", "delay")
+        cfg_file = os.path.join(base, path)
+        if os.path.exists(cfg_file):
+            try:
+                cfg.read(cfg_file)
+                delay = cfg.getfloat("Refresh", "delay")
+            except Exception:
+                pass
+        # fallback pros caminhos do config.ini se os inclusos nao existirem
+        if not os.path.exists(adb):
+            try:
+                adb = cfg.get("Refresh", "adbPath")
+            except Exception:
+                pass
+        if not os.path.exists(tess):
+            try:
+                tess = cfg.get("Refresh", "tesseractPath")
+            except Exception:
+                pass
+
+        self.adb_path = '"' + adb + '"'
+        ocr.pytesseract.tesseract_cmd = tess
+        self.delay = delay
 
     def _adb_prefix(self):
         if self.device:

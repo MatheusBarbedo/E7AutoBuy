@@ -1,44 +1,101 @@
-# E7AutoBuy (adaptado para MuMu Player Nx)
+# E7 Shop refresher - Barbedo
 
-Bot de auto-compra da Secret Shop do Epic Seven, baseado no
-[E7AutoBuy original](https://github.com/senkkou/E7AutoBuy), com correções
-para funcionar no **MuMu Player Nx** (que usa múltiplos displays virtuais).
+Automatiza o *refresh* e a compra na **Secret Shop** do Epic Seven, comprando
+automaticamente **Covenant Bookmarks** e **Mystic Medals** enquanto você gasta
+uma quantidade definida de skystones. Interface gráfica com controle de
+velocidade, pausar/retomar/encerrar e status ao vivo.
 
-## Como rodar
+Baseado no [E7AutoBuy original](https://github.com/senkkou/E7AutoBuy), com
+correções para funcionar em emuladores modernos como o **MuMu Player Nx**
+(que usa múltiplos displays virtuais).
 
-1. Abra o MuMu com o Epic Seven **em inglês**, na tela da **Secret Shop**.
-2. Duplo-clique em `AutoBuy.bat` (abre a interface gráfica).
-3. Informe **quantos skystones** quer gastar (cada refresh custa 3 — ele
-   calcula os refreshes automaticamente) e clique **Iniciar**.
+---
 
-Durante a execução você pode **Pausar/Retomar** e **Encerrar** a qualquer
-momento, com status ao vivo (refreshes, skystones, bookmarks e medals).
-O programa detecta sozinho o device e o display do E7 a cada execução.
+## Emuladores compatíveis
 
-## Arquivos
+| Emulador | Status | Observação |
+|---|---|---|
+| **MuMu Player Nx** | ✅ | Suportado via detecção automática de display (multi-display) |
+| **MuMu Player 12** | ✅ | Display único, funciona direto |
+| **LDPlayer** | ✅ | Recomendado; suportado desde o projeto original |
+| **BlueStacks** | ⚠️ | Funciona, mas algumas versões têm o ADB com problema |
+| **Nox** | ✅ | Deve funcionar (ADB padrão) |
 
-- `autobuy_gui.py` — interface gráfica (Iniciar/Pausar/Encerrar + status ao vivo).
+**Requisitos do emulador:**
+- **ADB habilitado** (depuração via ADB ligada nas configurações do emulador).
+- **Resolução 16:9** — 1280x720, 1920x1080 ou 2560x1080.
+- **Epic Seven em inglês** (o reconhecimento de texto procura "Covenant
+  Bookmarks" e "Mystic Medals").
+
+---
+
+## Passo a passo
+
+1. **Abra o emulador** e habilite o **ADB** (ex.: no MuMu → Configurações →
+   Outras configurações → Depuração ADB; no LDPlayer → Configurações → Outras
+   configurações → ADB).
+2. **Coloque o Epic Seven em inglês** (configurações do jogo) e entre na conta.
+3. **Vá até a Secret Shop** (Loja Secreta) e deixe essa tela aberta.
+4. **Abra o programa** (duplo-clique no atalho instalado ou no `AutoBuy.bat`).
+5. **Preencha:**
+   - **Skystones a gastar** — quanto quer gastar (cada refresh custa 3; ele
+     calcula os refreshes sozinho).
+   - **Delay** — velocidade. Menor = mais rápido (padrão 1.5). Se começar a
+     errar cliques, aumente um pouco.
+6. Clique **Iniciar**. Durante a execução você pode **Pausar/Retomar** e
+   **Encerrar** a qualquer momento. O painel mostra refreshes, skystones,
+   bookmarks e medals em tempo real.
+
+O programa detecta sozinho o device e o display do E7 a cada execução, e se
+conecta ao ADB automaticamente.
+
+---
+
+## Arquivos do projeto
+
+- `autobuy_gui.py` — interface gráfica (Iniciar/Pausar/Encerrar + status e log).
 - `autobuy_fixed.py` — versão de terminal (mesma lógica, sem janela).
 - `e7core.py` — núcleo da automação (ADB, detecção de display, OCR, compras).
-- `AutoBuy.bat` — atalho de duplo-clique (abre a interface).
+- `AutoBuy.bat` — atalho que abre a interface (sem console).
+- `platform-tools/` e `tesseract/` — ADB e OCR inclusos.
 
-## Correções em relação ao original (`autobuy_fixed.py`)
+## Rodando pelo código (desenvolvimento)
 
-O MuMu Nx expõe 3 displays virtuais (launcher + apps), o que quebrava o
-bot de três formas — todas corrigidas:
+Requer Python 3 com `pytesseract` e `Pillow`:
 
-1. **Screenshot corrompido** — o `screencap` vinha com um aviso de
-   "multiple displays" antes do PNG. Agora o código corta tudo antes do
-   cabeçalho `\x89PNG`.
-2. **Cliques iam para a home** — os toques eram enviados ao display padrão
-   (launcher). Agora usa `input -d <id_lógico>` no display do E7.
+```bash
+pip install pytesseract Pillow
+python autobuy_gui.py
+```
+
+---
+
+## Correções em relação ao original
+
+O MuMu Nx expõe vários displays virtuais (launcher + apps), o que quebrava o
+bot. Foram corrigidos:
+
+1. **Screenshot corrompido** — o `screencap` vinha com um aviso de "multiple
+   displays" antes do PNG; agora o código corta tudo antes do cabeçalho PNG.
+2. **Cliques iam para a home** — os toques iam ao display padrão (launcher);
+   agora usam `input -d <id_lógico>` no display do E7.
 3. **Swipe não funcionava** — sintaxe corrigida para `input -d <id> swipe`.
+4. **Conexão automática ao ADB** e seleção de um único device (evita o erro
+   "more than one device/emulator").
 
-Também fixa um único device automaticamente (evita o erro
-"more than one device/emulator").
+Além disso: interface gráfica, entrada por skystones, controle de velocidade
+(delay), pausar/retomar/encerrar e execução sem janela de console.
 
-## Requisitos
+---
 
-- Python 3 com `pytesseract` e `Pillow`
-- `platform-tools` (adb) e `tesseract` — inclusos nesta pasta
-- Resolução do emulador em 16:9 (ex.: 1920x1080)
+## Créditos
+
+- Projeto original: **[E7AutoBuy](https://github.com/senkkou/E7AutoBuy)** por
+  [senkkou](https://github.com/senkkou) — toda a lógica base de reroll/compra
+  e o mapeamento da Secret Shop vieram dele.
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) — reconhecimento
+  de texto.
+- [Android Platform Tools (ADB)](https://developer.android.com/tools/releases/platform-tools)
+  — comunicação com o emulador.
+
+Adaptação para MuMu Nx, interface gráfica e melhorias por **Matheus Barbedo**.

@@ -12,7 +12,7 @@ import configparser
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 
-from e7core import E7Core, log_crash, SKYSTONES_PER_REFRESH
+from e7core import E7Core, log_crash, app_path, SKYSTONES_PER_REFRESH
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ def worker(core, controls, state, rolls, delay):
         state.emit(f"Fim. Bookmarks={5 * state.bookmarks}  Medals={50 * state.medals}  "
                    f"Gold={gold}")
         try:
-            with open("logs.txt", "a") as log:
+            with open(app_path("logs.txt"), "a") as log:
                 log.write(
                     f"Started at {start}\nEnded at {end}\n"
                     f"Time elapsed: {end - start}\nRefreshes = {completed}\n"
@@ -239,7 +239,7 @@ class App:
     def _config_delay(self):
         try:
             cfg = configparser.ConfigParser()
-            cfg.read("config.ini")
+            cfg.read(app_path("config.ini"))
             return cfg.get("Refresh", "delay").strip()
         except Exception:
             return "1.5"
