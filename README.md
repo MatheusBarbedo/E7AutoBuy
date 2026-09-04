@@ -7,10 +7,20 @@ para funcionar no **MuMu Player Nx** (que usa múltiplos displays virtuais).
 ## Como rodar
 
 1. Abra o MuMu com o Epic Seven **em inglês**, na tela da **Secret Shop**.
-2. Duplo-clique em `AutoBuy.bat` (ou rode `python autobuy_fixed.py`).
-3. Informe o número de refreshes e confirme.
+2. Duplo-clique em `AutoBuy.bat` (abre a interface gráfica).
+3. Informe **quantos skystones** quer gastar (cada refresh custa 3 — ele
+   calcula os refreshes automaticamente) e clique **Iniciar**.
 
-O script detecta sozinho o device e o display do E7 a cada execução.
+Durante a execução você pode **Pausar/Retomar** e **Encerrar** a qualquer
+momento, com status ao vivo (refreshes, skystones, bookmarks e medals).
+O programa detecta sozinho o device e o display do E7 a cada execução.
+
+## Arquivos
+
+- `autobuy_gui.py` — interface gráfica (Iniciar/Pausar/Encerrar + status ao vivo).
+- `autobuy_fixed.py` — versão de terminal (mesma lógica, sem janela).
+- `e7core.py` — núcleo da automação (ADB, detecção de display, OCR, compras).
+- `AutoBuy.bat` — atalho de duplo-clique (abre a interface).
 
 ## Correções em relação ao original (`autobuy_fixed.py`)
 
