@@ -2,12 +2,14 @@
 
 Voce informa quantos SKYSTONES quer gastar (cada refresh custa 3) e
 controla a execucao com Iniciar / Pausar-Retomar / Encerrar, com status
-ao vivo. A automacao roda numa thread separada pra janela nunca travar.
+ao vivo e um painel de log. A automacao roda numa thread separada pra a
+janela nunca travar. Nao usa console (abra pelo AutoBuy.bat).
 """
+import queue
 import threading
 import datetime
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, scrolledtext
 
 from e7core import E7Core, log_crash, SKYSTONES_PER_REFRESH
 
@@ -55,6 +57,11 @@ class RunState:
         self.finished = False
         self.error = None
         self.stopped = False
+        self.log = queue.Queue()
+
+    def emit(self, msg):
+        stamp = datetime.datetime.now().strftime("%H:%M:%S")
+        self.log.put(f"[{stamp}] {msg}")
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +69,9 @@ class RunState:
 # ---------------------------------------------------------------------------
 def worker(core, controls, state, rolls):
     try:
+        state.emit("Detectando emulador e display do E7...")
         core.setup()
+        state.emit(f"Device: {core.device}  |  display logico: {core.e7_input_display}")
         res = core.screen()
         if not core.is_16_9(res):
             state.error = (f"Resolucao {res.size[0]}x{res.size[1]} nao suportada. "
@@ -70,6 +79,8 @@ def worker(core, controls, state, rolls):
             state.finished = True
             return
         core.compute_coords(res)
+        state.emit(f"Resolucao {res.size[0]}x{res.size[1]}. Iniciando "
+                   f"{rolls} refreshes ({rolls * SKYSTONES_PER_REFRESH} skystones).")
 
         state.status = "Rodando"
         start = datetime.datetime.now()
@@ -77,6 +88,7 @@ def worker(core, controls, state, rolls):
         for x in range(rolls + 1):
             if not controls.wait_if_paused():
                 state.stopped = True
+                state.emit("Encerrado pelo usuario.")
                 break
             bm, mm = core.scan_and_buy()
             state.bookmarks += bm
@@ -84,15 +96,27 @@ def worker(core, controls, state, rolls):
             state.current_refresh = x
             state.skystones_spent = x * SKYSTONES_PER_REFRESH
             completed = x
+            msg = f"Refresh {x}/{rolls}"
+            if bm or mm:
+                achados = []
+                if bm:
+                    achados.append(f"{bm}x Covenant Bookmark")
+                if mm:
+                    achados.append(f"{mm}x Mystic Medal")
+                msg += "  -> COMPROU " + ", ".join(achados)
+            state.emit(msg)
             if x == rolls:
                 break
             if controls.should_stop():
                 state.stopped = True
+                state.emit("Encerrado pelo usuario.")
                 break
             core.reroll()
 
         end = datetime.datetime.now()
         gold = ((184 * state.bookmarks) + (280 * state.medals)) * 1000
+        state.emit(f"Fim. Bookmarks={5 * state.bookmarks}  Medals={50 * state.medals}  "
+                   f"Gold={gold}")
         try:
             with open("logs.txt", "a") as log:
                 log.write(
@@ -106,6 +130,7 @@ def worker(core, controls, state, rolls):
     except Exception:
         log_crash("\nErro na interface grafica")
         state.error = "Erro durante a execucao (veja crash.log)."
+        state.emit("ERRO: veja crash.log")
     finally:
         state.finished = True
 
@@ -139,14 +164,15 @@ class App:
 
         # --- entrada de skystones ---
         ttk.Label(root, text="Skystones a gastar:").grid(row=1, column=0, sticky="w")
-        self.sky_var = tk.StringVar(value="4500")
+        self.sky_var = tk.StringVar(value="")
         self.sky_entry = ttk.Entry(root, width=10, textvariable=self.sky_var,
                                    justify="right")
         self.sky_entry.grid(row=1, column=1, sticky="w", padx=(6, 6))
-        self.refresh_hint = ttk.Label(root, text="", foreground="#555")
+        self.sky_entry.focus()
+        self.refresh_hint = ttk.Label(root, text="cada refresh custa 3 skystones",
+                                      foreground="#777")
         self.refresh_hint.grid(row=1, column=2, sticky="w")
         self.sky_var.trace_add("write", lambda *_: self._update_hint())
-        self._update_hint()
 
         # --- botoes ---
         btns = ttk.Frame(root)
@@ -182,6 +208,13 @@ class App:
             self.val[key] = v
         self.val["status"].config(text="Pronto")
 
+        # --- painel de log ---
+        ttk.Label(root, text="Log:").grid(row=5, column=0, sticky="w", pady=(12, 2))
+        self.log_box = scrolledtext.ScrolledText(
+            root, width=52, height=10, state="disabled", wrap="word",
+            font=("Consolas", 9))
+        self.log_box.grid(row=6, column=0, columnspan=3, sticky="we")
+
         root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ---- helpers ----
@@ -194,12 +227,34 @@ class App:
         return rolls, rolls * SKYSTONES_PER_REFRESH
 
     def _update_hint(self):
+        raw = self.sky_var.get().strip()
+        if not raw:
+            self.refresh_hint.config(text="cada refresh custa 3 skystones",
+                                     foreground="#777")
+            return
         rolls, real_sky = self._parse_rolls()
         if rolls and rolls > 0:
             self.refresh_hint.config(
-                text=f"= {rolls} refreshes  ({real_sky} skystones)")
+                text=f"= {rolls} refreshes  ({real_sky} skystones)",
+                foreground="#0a7d00")
         else:
-            self.refresh_hint.config(text="valor invalido")
+            self.refresh_hint.config(text="valor invalido", foreground="#c00000")
+
+    def _append_log(self, text):
+        self.log_box.config(state="normal")
+        self.log_box.insert("end", text + "\n")
+        # mantem o log enxuto em execucoes longas
+        if int(self.log_box.index("end-1c").split(".")[0]) > 1000:
+            self.log_box.delete("1.0", "500.0")
+        self.log_box.see("end")
+        self.log_box.config(state="disabled")
+
+    def _drain_log(self):
+        while self.state and not self.state.log.empty():
+            try:
+                self._append_log(self.state.log.get_nowait())
+            except queue.Empty:
+                break
 
     def _set_running_ui(self, running):
         self.sky_entry.config(state="disabled" if running else "normal")
@@ -264,6 +319,7 @@ class App:
 
     def _poll(self):
         s = self.state
+        self._drain_log()
         self.val["status"].config(text=self._derive_status(s))
         self.val["refresh"].config(text=f"{s.current_refresh} / {s.total_refresh}")
         self.val["sky"].config(text=f"{s.skystones_spent} / {s.skystones_total}")
@@ -271,6 +327,7 @@ class App:
         self.val["mm"].config(text=str(s.medals))
 
         if s.finished:
+            self._drain_log()
             self._on_finished(s)
         else:
             self.root.after(300, self._poll)
